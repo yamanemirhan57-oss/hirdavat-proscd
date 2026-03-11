@@ -1,151 +1,165 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 
-/* ── GLOBAL STYLES (Senin Tasarımın) ── */
+/* ── KUZENİN DÜKKAN TASARIMI ── */
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #080808; }
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: #111; }
-  ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+  body { background: #080808; color: #f0f0f0; font-family: 'JetBrains Mono', monospace; }
+  .card-hover:hover { border-color: #ff6b2b !important; transform: translateY(-2px); transition: all 0.2s; }
+  input, select { background: #0a0a0a; border: 1px solid #2a2a2a; color: white; padding: 12px; border-radius: 10px; outline: none; width: 100%; }
   @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
-  @keyframes slideIn { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
-  .card-hover:hover { border-color: #333 !important; transform: translateY(-1px); transition: all 0.2s; }
-  .btn-hover:hover { filter: brightness(1.2); transform: translateY(-1px); }
 `;
 
-const C = {
-  bg: "#080808", surface: "#0f0f0f", card: "#141414", border: "#1f1f1f",
-  borderBright: "#2a2a2a", orange: "#ff6b2b", yellow: "#fbbf24",
-  green: "#10b981", red: "#f43f5e", blue: "#3b82f6", text: "#f0f0f0",
-  textDim: "#888", mono: "'JetBrains Mono', monospace", display: "'Syne', sans-serif",
+const C = { 
+  orange: "#ff6b2b", green: "#10b981", red: "#f43f5e", blue: "#3b82f6",
+  card: "#141414", border: "#1f1f1f", display: "'Syne', sans-serif" 
 };
 
-const KATEGORILER = [
-  { ad: "Vidalarım", emoji: "🔩", renk: "#ff6b2b" },
-  { ad: "Çivilerim", emoji: "📌", renk: "#fbbf24" },
-  { ad: "El Aletlerim", emoji: "🔧", renk: "#3b82f6" },
-  { ad: "Elektriğim", emoji: "⚡", renk: "#eab308" },
-  { ad: "Silikonlarım", emoji: "🎨", renk: "#ec4899" },
-  { ad: "Borularım", emoji: "🔗", renk: "#06b6d4" },
-  { ad: "Yapı", emoji: "🧱", renk: "#a78bfa" },
-  { ad: "Hırdavatım", emoji: "⚙️", renk: "#10b981" },
-  { ad: "Diğerleri", emoji: "📦", renk: "#6b7280" },
-];
-
-/* ── UI BİLEŞENLERİ (Senin Tasarımın) ── */
-function Tag({ children, color = C.orange, small }) {
-  return <span style={{ background: color + "18", color, border: `1px solid ${color}35`, borderRadius: 5, padding: small ? "2px 7px" : "3px 10px", fontSize: small ? "0.65rem" : "0.72rem", fontWeight: 700, fontFamily: C.mono, whiteSpace: "nowrap" }}>{children}</span>;
-}
-
-function Btn({ children, color = C.orange, onClick, full, sm, disabled }) {
-  return <button onClick={onClick} disabled={disabled} className="btn-hover" style={{ background: `${color}15`, color, border: `1px solid ${color}50`, borderRadius: 8, padding: sm ? "6px 14px" : "10px 20px", cursor: "pointer", fontWeight: 700, fontSize: sm ? "0.75rem" : "0.82rem", fontFamily: C.mono, width: full ? "100%" : "auto" }}>{children}</button>;
-}
-
-// Yeni: Güvenlik Kapısı
-const Login = ({ onLogin }) => {
+export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [pass, setPass] = useState("");
-  return (
-    <div style={{height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:C.bg, color:'white', fontFamily:C.display}}>
-      <div style={{background:C.card, padding:'40px', borderRadius:'20px', border:`1px solid ${C.border}`, textAlign:'center', width:'350px'}}>
-        <h2 style={{color:C.orange, marginBottom:'10px'}}>🔩 HIRDAVAT PRO</h2>
-        <input type="password" placeholder="Yönetici Şifresi" onChange={(e)=>setPass(e.target.value)} style={{width:'100%', padding:'12px', borderRadius:'10px', border:`1px solid ${C.borderBright}`, background:'black', color:'white', margin:'20px 0', textAlign:'center', outline:'none'}} />
-        <Btn onClick={() => pass === "hirdavat2026" ? onLogin() : alert("Şifre Hatalı!")} full color={C.orange}>Sisteme Gir</Btn>
+  const [tab, setTab] = useState("stok");
+  const [stok, setStok] = useState([]);
+  const [musteriler, setMusteriler] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [yeniUrun, setYeniUrun] = useState({ ad: "", kategori: "Vidalarım", stok: 0, fiyat: 0, kritik: 10 });
+
+  useEffect(() => { if (isLoggedIn) verileriCek(); }, [isLoggedIn]);
+
+  const verileriCek = async () => {
+    const { data: sData } = await supabase.from('stok').select('*').order('ad');
+    const { data: mData } = await supabase.from('musteriler').select('*').order('borc', { ascending: false });
+    if (sData) setStok(sData);
+    if (mData) setMusteriler(mData);
+    setLoading(false);
+  };
+
+  const urunEkle = async () => {
+    if (!yeniUrun.ad) return alert("Ad gir kanka!");
+    await supabase.from('stok').insert([yeniUrun]);
+    setModal(false);
+    verileriCek();
+  };
+
+  const miktarGuncelle = async (id, miktar) => {
+    await supabase.from('stok').update({ stok: miktar }).eq('id', id);
+    setStok(prev => prev.map(s => s.id === id ? { ...s, stok: miktar } : s));
+  };
+
+  // RAPOR HESAPLAMALARI
+  const toplamStokDegeri = stok.reduce((a, s) => a + (s.stok * s.fiyat), 0);
+  const toplamAlacak = musteriler.reduce((a, m) => a + m.borc, 0);
+  const kritikUrunSayisi = stok.filter(s => s.stok <= s.kritik).length;
+
+  if (!isLoggedIn) return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080808' }}>
+      <style>{globalStyle}</style>
+      <div style={{ background: '#141414', padding: '40px', borderRadius: '25px', border: '1px solid #1f1f1f', textAlign: 'center', width: '350px' }}>
+        <h2 style={{ color: C.orange, fontFamily: C.display }}>🔩 HIRDAVAT PRO</h2>
+        <input type="password" placeholder="Şifre" onChange={(e) => setPass(e.target.value)} style={{ margin: '20px 0', textAlign: 'center' }} />
+        <button onClick={() => pass === "hirdavat2026" ? setIsLoggedIn(true) : alert("Hatalı!")} style={{ background: C.orange, color: 'white', border: 'none', padding: '15px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', width: '100%' }}>GİRİŞ YAP</button>
       </div>
     </div>
   );
-};
-
-/* ── ANA UYGULAMA ── */
-export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [tab, setTab] = useState("stok");
-  const [stok, setStok] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // SUPABASE'DEN VERİ ÇEKME
-  useEffect(() => {
-    if (isLoggedIn) {
-      const verileriCek = async () => {
-        const { data } = await supabase.from('stok').select('*').order('ad');
-        if (data) setStok(data);
-        setLoading(false);
-      };
-      verileriCek();
-    }
-  }, [isLoggedIn]);
-
-  // STOK GÜNCELLEME (Supabase'e yazar)
-  const stokGuncelle = async (id, yeniMiktar) => {
-    const { error } = await supabase.from('stok').update({ stok: yeniMiktar }).eq('id', id);
-    if (!error) setStok(prev => prev.map(s => s.id === id ? { ...s, stok: yeniMiktar } : s));
-  };
-
-  useEffect(() => {
-    const style = document.createElement("style");
-    style.textContent = globalStyle;
-    document.head.appendChild(style);
-    return () => document.head.removeChild(style);
-  }, []);
-
-  if (!isLoggedIn) return <Login onLogin={() => setIsLoggedIn(true)} />;
 
   return (
-    <div style={{ background: C.bg, minHeight: "100vh", color: C.text }}>
-      {/* Senin Header Tasarımın */}
-      <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: "0 1.5rem", position: "sticky", top: 0, zIndex: 100 }}>
-        <div style={{ maxWidth: 1000, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: C.orange + "20", border: `2px solid ${C.orange}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>🔩</div>
-            <div style={{fontFamily: C.display, fontWeight: 900, color: C.orange}}>HIRDAVAT PRO</div>
-          </div>
-          <div style={{ display: "flex", gap: 5 }}>
-            {['stok', 'veresiye', 'rapor'].map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{ background: tab === t ? C.orange + "15" : "none", border: "none", color: tab === t ? C.orange : C.textDim, fontFamily: C.mono, fontSize: "0.8rem", fontWeight: 700, padding: "8px 15px", cursor: "pointer", borderRadius: "8px" }}>{t.toUpperCase()}</button>
-            ))}
-          </div>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
+      <style>{globalStyle}</style>
+      
+      {/* NAV MENÜ */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', background: C.card, padding: '15px 25px', borderRadius: '18px', border: `1px solid ${C.border}` }}>
+        <div style={{ fontFamily: C.display, color: C.orange, fontWeight: 900 }}>HIRDAVAT PRO</div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {['stok', 'veresiye', 'rapor'].map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ background: tab === t ? C.orange : 'transparent', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.75rem' }}>{t.toUpperCase()}</button>
+          ))}
         </div>
       </div>
 
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: "1.8rem 1.2rem" }}>
-        {loading ? (
-          <p style={{fontFamily:C.mono, color:C.textDim}}>Bulut veritabanına bağlanılıyor...</p>
-        ) : (
-          <div style={{ animation: "fadeIn 0.4s ease" }}>
-            {tab === "stok" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {stok.map(s => {
-                  const kat = KATEGORILER.find(k => k.ad === s.kategori);
-                  return (
-                    <div key={s.id} className="card-hover" style={{ background: C.card, borderRadius: 14, border: `1px solid ${C.border}`, padding: "1rem 1.2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
-                        <div style={{ fontSize: "1.5rem", background: s.renk + "10", width: 45, height: 45, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${s.renk}30` }}>{kat?.emoji || "📦"}</div>
-                        <div>
-                          <div style={{ fontFamily: C.display, fontWeight: 800, fontSize: "0.95rem", color: s.renk }}>{s.ad}</div>
-                          <Tag color={C.textDim} small>{s.kategori} · {s.kod}</Tag>
-                        </div>
+      {loading ? <p>Yükleniyor...</p> : (
+        <div style={{ animation: 'fadeIn 0.4s ease' }}>
+          
+          {/* STOK SEKEMESİ */}
+          {tab === "stok" && (
+            <div>
+              <button onClick={() => setModal(true)} style={{ background: C.green, color: 'white', border: 'none', padding: '12px', borderRadius: '12px', cursor: 'pointer', width: '100%', fontWeight: 'bold', marginBottom: '15px' }}>＋ YENİ ÜRÜN EKLE</button>
+              <div style={{ display: 'grid', gap: '10px' }}>
+                {stok.map(s => (
+                  <div key={s.id} className="card-hover" style={{ background: C.card, padding: '15px 20px', borderRadius: '15px', border: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: 800, color: C.orange, fontFamily: C.display }}>{s.ad}</div>
+                      <div style={{ fontSize: '0.7rem', color: '#666' }}>Birim Fiyat: ₺{s.fiyat}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '1.4rem', fontWeight: 900, color: s.stok <= s.kritik ? C.red : 'white' }}>{s.stok}</div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontFamily: C.display, fontWeight: 900, fontSize: "1.4rem", color: C.green }}>{s.stok}</div>
-                          <div style={{ fontSize: "0.6rem", color: C.textDim, fontFamily: C.mono }}>ADET</div>
-                        </div>
-                        <div style={{ display: "flex", gap: 5 }}>
-                          <Btn sm color={C.red} onClick={() => stokGuncelle(s.id, s.stok - 1)}>−</Btn>
-                          <Btn sm color={C.green} onClick={() => stokGuncelle(s.id, s.stok + 1)}>+</Btn>
-                        </div>
+                      <div style={{ display: 'flex', gap: '5px' }}>
+                        <button onClick={() => miktarGuncelle(s.id, s.stok - 1)} style={{ background: C.red, border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer' }}>-</button>
+                        <button onClick={() => miktarGuncelle(s.id, s.stok + 1)} style={{ background: C.green, border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '8px', cursor: 'pointer' }}>+</button>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
-            )}
-            {tab !== "stok" && <p style={{color:C.textDim, textAlign:'center', marginTop:'50px', fontFamily:C.mono}}>Bu sekme için Supabase ayarlarını yapıyoruz kanka...</p>}
+            </div>
+          )}
+
+          {/* VERESİYE SEKEMESİ */}
+          {tab === "veresiye" && (
+            <div style={{ display: 'grid', gap: '10px' }}>
+              <h3 style={{ fontFamily: C.display, color: C.orange, marginBottom: '10px' }}>📒 Müşteri Borçları</h3>
+              {musteriler.map(m => (
+                <div key={m.id} style={{ background: C.card, padding: '15px', borderRadius: '12px', border: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{m.ad}</span>
+                  <span style={{ color: C.red, fontWeight: 'bold' }}>₺{m.borc.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* RAPOR SEKEMESİ (Senin istediğin o özel bölüm) */}
+          {tab === "rapor" && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px' }}>
+              <div style={{ background: C.card, padding: '25px', borderRadius: '20px', border: `1px solid ${C.green}40`, textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem' }}>💰</div>
+                <div style={{ color: '#666', fontSize: '0.8rem', marginTop: '10px' }}>TOPLAM STOK DEĞERİ</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: C.green, marginTop: '5px' }}>₺{toplamStokDegeri.toLocaleString()}</div>
+              </div>
+              <div style={{ background: C.card, padding: '25px', borderRadius: '20px', border: `1px solid ${C.red}40`, textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem' }}>📒</div>
+                <div style={{ color: '#666', fontSize: '0.8rem', marginTop: '10px' }}>TOPLAM ALACAK (VERESİYE)</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: C.red, marginTop: '5px' }}>₺{toplamAlacak.toLocaleString()}</div>
+              </div>
+              <div style={{ background: C.card, padding: '25px', borderRadius: '20px', border: `1px solid ${C.orange}40`, textAlign: 'center' }}>
+                <div style={{ fontSize: '2rem' }}>⚠️</div>
+                <div style={{ color: '#666', fontSize: '0.8rem', marginTop: '10px' }}>KRİTİK STOKTAKİ ÜRÜN</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: C.orange, marginTop: '5px' }}>{kritikUrunSayisi} ÜRÜN</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODAL */}
+      {modal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: C.card, padding: '30px', borderRadius: '25px', border: `1px solid ${C.border}`, width: '90%', maxWidth: '400px' }}>
+            <h3 style={{ marginBottom: '20px', fontFamily: C.display }}>YENİ ÜRÜN</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <input placeholder="Ürün Adı" onChange={e => setYeniUrun({...yeniUrun, ad: e.target.value})} />
+              <input type="number" placeholder="Stok" onChange={e => setYeniUrun({...yeniUrun, stok: parseInt(e.target.value)})} />
+              <input type="number" placeholder="Fiyat" onChange={e => setYeniUrun({...yeniUrun, fiyat: parseFloat(e.target.value)})} />
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button onClick={() => setModal(false)} style={{ flex: 1, padding: '12px', borderRadius: '10px', background: '#333', border: 'none', color: 'white' }}>İptal</button>
+                <button onClick={urunEkle} style={{ flex: 1, padding: '12px', borderRadius: '10px', background: C.orange, border: 'none', color: 'white', fontWeight: 'bold' }}>KAYDET</button>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
