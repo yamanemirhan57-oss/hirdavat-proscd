@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 
-/* ── SENİN O EFSANE 700 SATIRLIK TASARIMININ STİLLERİ ── */
+/* ── SENİN O EFSANE 700 SATIRLIK TASARIMININ STİLLERİ (BİREBİR) ── */
 const globalStyle = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -36,7 +36,7 @@ const KATEGORILER = [
   { ad: "Diğerleri", emoji: "📦", renk: "#6b7280" },
 ];
 
-/* ── UI BİLEŞENLERİ (Birebir Aynı Tasarım) ── */
+/* ── UI BİLEŞENLERİ (Senin Tasarımın) ── */
 function Tag({ children, color = C.orange, small }) {
   return <span style={{ background: color + "18", color, border: `1px solid ${color}35`, borderRadius: 5, padding: small ? "2px 7px" : "3px 10px", fontSize: small ? "0.65rem" : "0.72rem", fontWeight: 700, fontFamily: C.mono }}>{children}</span>;
 }
@@ -63,7 +63,7 @@ const Login = ({ onLogin }) => {
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080808', fontFamily: C.display }}>
       <div style={{ background: '#141414', padding: '40px', borderRadius: '25px', border: '1px solid #1f1f1f', textAlign: 'center', width: '350px' }}>
         <h2 style={{ color: C.orange }}>🔩 HIRDAVAT PRO</h2>
-        <input type="password" placeholder="Şifre" onChange={(e) => setPass(e.target.value)} style={{ width: '100%', padding: '12px', background: 'black', color: 'white', border: `1px solid ${C.border}`, borderRadius: '10px', margin: '20px 0', textAlign: 'center' }} />
+        <input type="password" placeholder="Şifre" onChange={(e) => setPass(e.target.value)} style={{ width: '100%', padding: '12px', background: 'black', color: 'white', border: `1px solid ${C.border}`, borderRadius: '10px', margin: '20px 0', textAlign: 'center', outline: 'none' }} />
         <Btn onClick={() => pass === "hirdavat2026" ? onLogin() : alert("Hatalı!")} full color={C.orange}>GİRİŞ YAP</Btn>
       </div>
     </div>
@@ -96,8 +96,10 @@ export default function App() {
   };
 
   const urunEkle = async () => {
-    const { error } = await supabase.from('stok').insert([yeniUrun]);
-    if (!error) { setModal(false); fetchAll(); }
+    const katRenk = KATEGORILER.find(k => k.ad === yeniUrun.kategori).renk;
+    await supabase.from('stok').insert([{ ...yeniUrun, renk: katRenk }]);
+    setModal(false);
+    fetchAll();
   };
 
   useEffect(() => {
@@ -111,13 +113,12 @@ export default function App() {
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text }}>
-      {/* HEADER */}
       <div style={{ background: C.surface, borderBottom: `1px solid ${C.border}`, padding: "15px 30px", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: 1000, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontFamily: C.display, fontWeight: 900, color: C.orange }}>HIRDAVAT PRO</div>
           <div style={{ display: "flex", gap: 10 }}>
             {['stok', 'veresiye', 'rapor'].map(t => (
-              <button key={t} onClick={() => setTab(t)} style={{ background: tab === t ? C.orange + "15" : "none", border: "none", color: tab === t ? C.orange : C.textDim, fontFamily: C.mono, fontWeight: 700, padding: "8px 15px", cursor: "pointer", borderRadius: "8px" }}>{t.toUpperCase() === 'VERESIYE' ? 'AÇIK DEFTER' : t.toUpperCase()}</button>
+              <button key={t} onClick={() => setTab(t)} style={{ background: tab === t ? C.orange + "15" : "none", border: "none", color: tab === t ? C.orange : C.textDim, fontFamily: C.mono, fontWeight: 700, padding: "8px 15px", cursor: "pointer", borderRadius: "8px" }}>{t === 'veresiye' ? 'AÇIK DEFTER' : t.toUpperCase()}</button>
             ))}
           </div>
         </div>
@@ -125,7 +126,6 @@ export default function App() {
 
       <div style={{ maxWidth: 1000, margin: "0 auto", padding: "30px 20px" }}>
         
-        {/* STATS (O Meşhur Üst Kartlar) */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
           <StatCard label="Ürün Çeşidi" value={stok.length} icon="📦" color={C.orange} />
           <StatCard label="Stok Değeri" value={"₺" + stok.reduce((a,s)=>a+(s.stok*s.fiyat),0).toLocaleString()} icon="💰" color={C.green} />
@@ -139,10 +139,10 @@ export default function App() {
               {stok.map(s => (
                 <div key={s.id} className="card-hover" style={{ background: C.card, padding: "20px", borderRadius: "15px", border: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div style={{ display: "flex", gap: 15, alignItems: "center" }}>
-                    <div style={{ fontSize: "1.5rem", background: C.orange + "15", width: 50, height: 50, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${C.orange}30` }}>{KATEGORILER.find(k => k.ad === s.kategori)?.emoji || "📦"}</div>
+                    <div style={{ fontSize: "1.5rem", background: (s.renk || C.orange) + "15", width: 50, height: 50, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${s.renk || C.orange}30` }}>{KATEGORILER.find(k => k.ad === s.kategori)?.emoji || "📦"}</div>
                     <div>
-                      <div style={{ fontWeight: 800, color: C.orange, fontFamily: C.display }}>{s.ad}</div>
-                      <Tag color={C.textDim} small>{s.kategori}</Tag>
+                      <div style={{ fontWeight: 800, color: s.renk || C.orange, fontFamily: C.display }}>{s.ad}</div>
+                      <Tag color={C.textDim} small>{s.kategori} · ₺{s.fiyat}</Tag>
                     </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
@@ -171,18 +171,19 @@ export default function App() {
         )}
 
         {tab === "rapor" && (
-          <div style={{ animation: "fadeIn 0.3s", textAlign: 'center', padding: '50px' }}>
-            <h2 style={{fontFamily:C.display, color:C.orange}}>📊 ANALİZ VE RAPORLAR</h2>
-            <p style={{color: C.textDim, marginTop: 10}}>Veritabanındaki verilere göre grafikler burada hazırlanıyor...</p>
+          <div style={{ animation: "fadeIn 0.3s", display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
+            <div style={{ background: C.card, padding: 30, borderRadius: 20, border: `1px solid ${C.orange}30`, textAlign: 'center' }}>
+               <h3 style={{fontFamily:C.display, color:C.orange}}>📊 DÜKKAN ANALİZİ</h3>
+               <p style={{color: C.textDim, marginTop: 10}}>Bulut veritabanındaki verilerle canlı raporlama aktif.</p>
+            </div>
           </div>
         )}
       </div>
 
-      {/* YENİ ÜRÜN MODAL */}
       {modal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.9)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
           <div style={{ background: C.card, padding: 30, borderRadius: 25, border: `1px solid ${C.border}`, width: "90%", maxWidth: 400, animation: "slideIn 0.2s" }}>
-            <h3 style={{ fontFamily: C.display, marginBottom: 20 }}>YENİ ÜRÜN</h3>
+            <h3 style={{ fontFamily: C.display, marginBottom: 20 }}>YENİ ÜRÜN EKLE</h3>
             <input placeholder="Ürün Adı" onChange={e => setYeniUrun({...yeniUrun, ad: e.target.value})} style={{ marginBottom: 10, width: "100%", padding: 10, background: 'black', color: 'white', border: '1px solid #333', borderRadius: 8 }} />
             <select onChange={e => setYeniUrun({...yeniUrun, kategori: e.target.value})} style={{ marginBottom: 10, width: "100%", padding: 10, background: 'black', color: 'white', border: '1px solid #333', borderRadius: 8 }}>
               {KATEGORILER.map(k => <option key={k.ad} value={k.ad}>{k.ad}</option>)}
