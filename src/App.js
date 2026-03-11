@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { supabase } from "./supabaseClient";
+import { useState, useEffect } from "react";
+import { supabase } from "./supabaseClient"; // Bulut bağlantımız
 
 /* ── GLOBAL STYLES ── */
 const globalStyle = `
@@ -18,26 +18,12 @@ const globalStyle = `
 `;
 
 const C = {
-  bg: "#080808",
-  surface: "#0f0f0f",
-  card: "#141414",
-  cardHover: "#1a1a1a",
-  border: "#1f1f1f",
-  borderBright: "#2a2a2a",
-  orange: "#ff6b2b",
-  orangeDim: "#ff6b2b18",
-  orangeGlow: "#ff6b2b40",
-  yellow: "#fbbf24",
-  green: "#10b981",
-  red: "#f43f5e",
-  blue: "#3b82f6",
-  cyan: "#06b6d4",
-  purple: "#8b5cf6",
-  text: "#f0f0f0",
-  textDim: "#888",
-  textFaint: "#444",
-  mono: "'JetBrains Mono', monospace",
-  display: "'Syne', sans-serif",
+  bg: "#080808", surface: "#0f0f0f", card: "#141414", cardHover: "#1a1a1a",
+  border: "#1f1f1f", borderBright: "#2a2a2a", orange: "#ff6b2b",
+  orangeDim: "#ff6b2b18", orangeGlow: "#ff6b2b40", yellow: "#fbbf24",
+  green: "#10b981", red: "#f43f5e", blue: "#3b82f6", cyan: "#06b6d4",
+  purple: "#8b5cf6", text: "#f0f0f0", textDim: "#888", textFaint: "#444",
+  mono: "'JetBrains Mono', monospace", display: "'Syne', sans-serif",
 };
 
 const KATEGORILER = [
@@ -308,7 +294,13 @@ function StokEkrani({ stok, setStok }) {
     ? prev.map(s => s.id === form.id ? form : s)
     : [...prev, form]);
 
-  const sil = (id) => { if (window.confirm("Bu ürünü silmek istediğinize emin misiniz?")) setStok(prev => prev.filter(s => s.id !== id)); };
+  /* 🔥 İŞTE BURAYA SUPABASE DELETE EKLENDİ (GERİ GELMEYECEKLER) */
+  const sil = async (id) => { 
+    if (window.confirm("Bu ürünü silmek istediğinize emin misiniz?")) {
+      await supabase.from('stok').delete().eq('id', id);
+      setStok(prev => prev.filter(s => s.id !== id)); 
+    }
+  };
 
   const stokEkle = (id) => {
     const m = parseInt(miktar[id]);
@@ -460,7 +452,14 @@ function VeresiyeEkrani({ musteriler, setMusteriler }) {
     setYeniMus({ ad: "", tel: "" }); setMusEkleModal(false);
   };
 
-  const musSil = (id) => { if (window.confirm("Müşteriyi sil?")) { setMusteriler(p => p.filter(m => m.id !== id)); if (secili === id) setSecili(null); } };
+  /* 🔥 İŞTE BURAYA SUPABASE DELETE EKLENDİ (GERİ GELMEYECEKLER) */
+  const musSil = async (id) => { 
+    if (window.confirm("Müşteriyi sil?")) { 
+      await supabase.from('musteriler').delete().eq('id', id);
+      setMusteriler(p => p.filter(m => m.id !== id)); 
+      if (secili === id) setSecili(null); 
+    } 
+  };
 
   const toplamBorc = musteriler.reduce((a, m) => a + m.borc, 0);
 
@@ -665,7 +664,7 @@ function RaporEkrani({ stok, musteriler }) {
   );
 }
 
-/* ── ANA UYGULAMA (GÜNCELLENEN KISIM) ── */
+/* ── ANA UYGULAMA ── */
 const TABS = [
   { id: "stok", label: "Stok", icon: "📦" },
   { id: "veresiye", label: "Açık Defter", icon: "📒" },
@@ -676,50 +675,60 @@ export default function App() {
   const [tab, setTab] = useState("stok");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [pass, setPass] = useState("");
-  const [loading, setLoading] = useState(false);
+  
+  const [stok, setStok] = useState([]);
+  const [musteriler, setMusteriler] = useState([]);
   const [kayitMesaj, setKayitMesaj] = useState(false);
+  const [ilkYukleme, setIlkYukleme] = useState(true);
 
-  // Veritabanı State'leri
-  const [stok, setStok] = useState(initialStok);
-  const [musteriler, setMusteriler] = useState(initialMusteriler);
-
-  // 1. Giriş Yapılınca Supabase'den Verileri Çek
   useEffect(() => {
     if (isLoggedIn) {
-      setLoading(true);
-      const verileriCek = async () => {
+      const fetchAll = async () => {
         const { data: sData } = await supabase.from('stok').select('*').order('id');
         const { data: mData } = await supabase.from('musteriler').select('*').order('id');
+
+        const kurulum = localStorage.getItem("kurulum_yapildi");
         
-        if (sData && sData.length > 0) setStok(sData);
-        if (mData && mData.length > 0) setMusteriler(mData);
-        setLoading(false);
+        // Eğer kurulum yapılmadıysa ve bulut boşsa, initial verileri buluta yükle
+        if (!kurulum && (!sData || sData.length === 0)) {
+           await supabase.from('stok').upsert(initialStok);
+           await supabase.from('musteriler').upsert(initialMusteriler);
+           setStok(initialStok);
+           setMusteriler(initialMusteriler);
+           localStorage.setItem("kurulum_yapildi", "evet");
+        } else {
+           // Kurulum yapıldıysa buluttaki verileri ekrana bas (ürünler tamamen silinmiş olsa bile boş ekran gelsin diye)
+           if (sData) setStok(sData);
+           if (mData) setMusteriler(mData);
+           localStorage.setItem("kurulum_yapildi", "evet");
+        }
+        setIlkYukleme(false);
       };
-      verileriCek();
+      fetchAll();
     }
   }, [isLoggedIn]);
 
-  // 2. Stok Değişince Otomatik Olarak Supabase'e Kaydet
+  // STOK OTO-KAYDET (Sadece ilk yüklemeden sonra ve değişiklik oldukça)
   useEffect(() => {
-    if (!isLoggedIn || loading) return;
-    const timer = setTimeout(async () => {
+    if (!isLoggedIn || ilkYukleme || stok.length === 0) return;
+    const t = setTimeout(async () => {
       await supabase.from('stok').upsert(stok);
       setKayitMesaj(true);
       setTimeout(() => setKayitMesaj(false), 1500);
     }, 1000);
-    return () => clearTimeout(timer);
-  }, [stok, isLoggedIn, loading]);
+    return () => clearTimeout(t);
+  }, [stok, isLoggedIn, ilkYukleme]);
 
-  // 3. Müşteriler Değişince Otomatik Olarak Supabase'e Kaydet
+  // MÜŞTERİ OTO-KAYDET
   useEffect(() => {
-    if (!isLoggedIn || loading) return;
-    const timer = setTimeout(async () => {
+    if (!isLoggedIn || ilkYukleme || musteriler.length === 0) return;
+    const t = setTimeout(async () => {
       await supabase.from('musteriler').upsert(musteriler);
       setKayitMesaj(true);
       setTimeout(() => setKayitMesaj(false), 1500);
     }, 1000);
-    return () => clearTimeout(timer);
-  }, [musteriler, isLoggedIn, loading]);
+    return () => clearTimeout(t);
+  }, [musteriler, isLoggedIn, ilkYukleme]);
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -728,12 +737,11 @@ export default function App() {
     return () => document.head.removeChild(style);
   }, []);
 
-  // Şifre Giriş Ekranı
   if (!isLoggedIn) return (
     <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#080808' }}>
       <div style={{ background: '#141414', padding: '40px', borderRadius: '25px', border: '1px solid #1f1f1f', textAlign: 'center', width: '350px' }}>
         <h2 style={{ color: C.orange, fontFamily: C.display, marginBottom: '20px' }}>🔩 HIRDAVAT PRO</h2>
-        <input type="password" placeholder="Yönetici Şifresi" onChange={(e) => setPass(e.target.value)} style={{ width: '100%', padding: '12px', background: 'black', color: 'white', border: `1px solid ${C.border}`, borderRadius: '10px', marginBottom: '20px', textAlign: 'center', outline: 'none', fontFamily: C.mono }} />
+        <input type="password" placeholder="Şifre" onChange={(e) => setPass(e.target.value)} style={{ width: '100%', padding: '12px', background: 'black', color: 'white', border: `1px solid ${C.borderBright}`, borderRadius: '10px', marginBottom: '20px', textAlign: 'center', outline: 'none', fontFamily: C.mono }} />
         <Btn onClick={() => pass === "hirdavat2026" ? setIsLoggedIn(true) : alert("Hatalı!")} full color={C.orange}>GİRİŞ YAP</Btn>
       </div>
     </div>
